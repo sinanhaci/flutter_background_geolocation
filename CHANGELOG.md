@@ -1,5 +1,141 @@
 # CHANGELOG
 
+## 4.13.5 &mdash; 2012-11-16
+* [Android] Fix problem with polygon-geofencing license-validation not working in DEBUG builds when configured with product flavors.
+
+## 4.13.4 &mdash; 2023-11-06
+* [Android] HMS geolocation event does not provide a timestamp for the triggering location!!  Use System current time.
+* [Android] Remove deprecated flutter V1 plugin architecture code (`registerWith`).
+* [Android] Guard against Geofence SQLite query returning null in `GeofencingService`.
+* [Android] Fix `ConcurrentModificationException` in `SingleLocationRequest.getBestLocation`
+
+## 4.13.3 &mdash; 2023-10-12
+* [Android] Fix `IllegalStateException` calling addGeofences when number of geofences exceeds platform maximum (100).
+
+## 4.13.2 &mdash; 2023-10-05
+* [Android] Fix error *Unhandled Exception: type 'Null' is not a subtype of type 'List<Object?>'* in `BackgroundGeolocation.geofences` / `getGeofence(uuid)`.
+* [iOS] Rename iOS Obj-c classes, prefixing with `TS`.
+
+## 4.13.1 &mdash; 2023-10-02
+* [iOS] Fix "*Duplicate symbol error DummyPods_TSLocationManager*".
+
+## 4.13.0 &mdash; 2023-09-28
+* **Polygon Geofencing**:  The Background Geolocation SDK now supports *Polygon Geofences* (Geofences of any shape).  For more information, see API docs [`Geofence.vertices`](https://pub.dev/documentation/flutter_background_geolocation/latest/flt_background_geolocation/Geofence/vertices.html).  ℹ️ __*Polygon Geofencing*__ is [sold as a separate add-on](https://shop.transistorsoft.com/products/polygon-geofencing) (fully functional in *DEBUG* builds).
+
+![](https://dl.dropbox.com/scl/fi/sboshfvar0h41azmb4tyv/polygon-geofencing-parc-outremont-400.png?rlkey=d2s0n3zbzu72e7s2gch9kxd4a&dl=1)
+![](https://dl.dropbox.com/scl/fi/xz48myvjnpp8ko0l2tufg/polygon-geofencing-parc-lafontaine-400.png?rlkey=sf20ns959uj0a0fq0atmj55bz&dl=1)
+
+* Remove `backup_rules.xml` from `AndroidManifest.xml` &mdash; it's causing conflicts with other plugins.
+* [Android] Add proguard-rule for compilation of the android library to prevent from obfuscating the `BuildConfig` class to `a.a.class`, conflicting with other libraries.
+
+## 4.12.3 &mdash; 2023-09-05
+* [Android] Performance enhancements and error-checking.
+
+## 4.12.2 &mdash; 2023-08-24
+
+* [Android] Fix memory-leak in `.startBackgroundTask`:  If a `Task` timed-out and is "FORCE KILLED", it was never removed from a `List<Task>`.
+* [Android] Fix `Exception NullPointerException:at com.transistorsoft.locationmanager.util.BackgroundTaskWorker.onStopped`
+
+## 4.12.1 &mdash; 2023-08-23
+* [iOS] Fix build failure "Use of '@import' when C++ modules are disabled"
+* [Android] Modify Foreground-service management to use `stopSelfResult(startId)` instead of `stopSelf()`.  This could improve reports of Android ANR
+`Context.startForeground`.
+* [Android] Add sanity-check for invalid `Geofence` arguments (eg: invalid latitude/longitude).
+* [Android] Add safety-checks in ForegroundService stop-handling.  There was a report of a *reproducible* crash while aggressively calling `.getCurrentPosition` in a `Timer` (eg: every second).
+* [Android] Demote `HeartbeatService` from a Foreground Service to `AlarmManager` ONESHOT.  :warning: In your `onHeartbeat` event, if you intend to perform any kind of asynchronous function, you should wrap it inside `BackgroundGeolocation.startBackgroundTask` in order to prevents the OS from suspending your app before your task is complete:
+
+```dart
+BacckgroundGeolocation.onHeartbeat((event) async {
+  print("[onHeartbeat] $event");
+  // First register a background-task.
+  var taskId = await BackgroundGeolocation.startBackgroundTask();
+  try {
+    // Now you're free to perform long-running tasks, such as getCurrentPosition()
+    var location = await BackgroundGeolocation.getCurrentPosition(
+      samples: 3,
+      timeout: 30,
+      extras: {
+        "event": "heartbeat"
+      }
+    );
+    print("[onHeartbeat] location: $location");
+  } catch(error) {
+    print("[getCurrentPosition] ERROR: $error");
+  }
+  // Be sure to singal completion of your background-task:
+  BackgroundGeolocation.stopBackgroundTask(taskId);
+});
+```
+
+* [Android] Fix NPE iterating a `List` in `AbstractService`. 
+* [Android] If a `SingleLocationRequest` error occurs and at least one sample exits, prefer to resolve the request successfully rather than firing the error (eg: `getCurrentPosition`, `motionchange`, `providerchange` requests).
+
+## 4.12.0 &mdash; 2023-08-16
+* [Android] :warning: If you have the following elements defined in your __`AndroidManifest.xml`__, __DELETE__ them:
+```diff
+-       <service android:name="com.transistorsoft.locationmanager.service.TrackingService" android:foregroundServiceType="location" />
+-       <service android:name="com.transistorsoft.locationmanager.service.LocationRequestService" android:foregroundServiceType="location" />
+```
+* [Android] Re-factor getCurrentPosition to prefer more recent location vs more accuracy (within limits)
+* [Android] Android 14 (API 34) support:  Android 14 is more strict with scheduling `AlarmManager` "exact alarms" (which the plugin does take advantage of).  If you wish the plugin to use `AlarmManager` "exact alarms" in your app, you must now explicitly define that permission in your own `AndroidManifest`:
+```xml
+<manifest>
+    <uses-permission android:minSdkVersion="34" android:name="android.permission.USE_EXACT_ALARM" />
+</manifest>
+```
+
+* [Android] Android 14 (API 34) support:  Re-factor BackgroundTaskService to use `WorkManager` instead of a foreground-service.
+* [Android] Android 14 (API 34) support: Due to new runtime permission requirements on `AlarmManager` exact alarms (`android.permission.SCHEDULE_EXACT_ALARM`), the plugin can no longer rely upon launching a foreground-service using an exact alarm.  Instead, the plugin will create a geofence around the current position (configured with `initialTriggerEntry`) to hopefully immediately launch a foreground-service to handle the fake geofence event, since Android allows foreground-service launches due to Geofencing events.
+* [Android] Android 14 (API 34) support:  All foreground-services now require an `android:foregroundServiceType` in the plugin's `AndroidManifest` (handled automatically by the plugin).
+* [Android] Android 14 (API 34) support: Fix error "*One of RECEIVER_EXPORTED or RECEIVER_NOT_EXPORTED should be specified*" in `DeviceSettings.startMonitoringPowerSaveChanges`. 
+
+## 4.11.1 &mdash; 2023-06-09
+* Fix nullsafety issue in `TransistorAuthorizationToken.destroy`.
+* [Android] Log `ApiException.getStatusCode()` if native `addGeofence` method fails.
+* Update /example app for full nullsafety.
+
+## 4.11.0 &mdash; 2023-05-04
+* [Android] Gradle v8 now requires `namespace` attribute in gradle files.
+* [iOS] iOS 16.4 made a major change to location-services, exposed only when `Config.showsBackgroundLocationIndicator` is `false` (the default).  As a result of this change, `Config.showsBackgroundLocationIndicator` will now default to `true`.
+
+## 4.10.3 &mdash; 2023-04-19
+* [Android] Upgrade `logback-android` dependency to `3.0.0` (`org.slf4j-api` to `2.0.7).
+
+## 4.10.2 &mdash; 2023-04-12
+* [Android] Fix String concatenation issue on Turkish devices where method-name composed for use with reflection is incorrectly capitalized (ie: `isMoving -> `setIsMoving` is incorrectly capitalized with Turkish capital as `setİsMoving`.  Simply enforce `Locale.ENGLISH` when performing `String.toUpperCase(Locale.ENGLISH)`.
+
+* [iOS] Fix bug in TSScheduler.  When schedule was cleared via .setConfig, only the State.schedulerEnabled property was set to false, but the TSScheduler singleton contained an internal 'enabled' property which was not reset to false.  Solution was to simply call stop() method upon TSScheduler singleton.
+
+## 4.10.1 &mdash; 2023-03-30
+* [Android] Bump default `hmsLocationVersion = 6.9.0.300`.  There are reports of Google rejecting apps due to older huawei HMS dependenc
+ies.
+* [Android] Fix `ClassCastException` related to Motion API error
+
+## 4.10.0 &mdash; 2023-03-29
+* [Android] Introduce __Huawei HMS Support__.  Requires a separate license key [purchased here](https://shop.transistorsoft.com/collections/frontpage/products/huawei-background-geolocation).
+* [iOS] Fix for iOS 16.4.  iOS 16.4 introduces changes to CoreLocation behaviour when using Config.showsBackgroundLocationIndi
+cator: false.
+* [Android] Added extra logic in a location error-handler to mitigate against a possible edge-case where a location-error fetching the onMotionChange position could possibly result in an infinite loop, causing a stackoverflow exception:
+```
+at com.transistorsoft.locationmanager.service.TrackingService.changePace(TrackingService.java:264)
+at com.transistorsoft.locationmanager.service.TrackingService$c.onError(TrackingService.java:69)
+at com.transistorsoft.locationmanager.location.SingleLocationRequest.onError(SingleLocationRequest.java:18)
+at com.transistorsoft.locationmanager.location.SingleLocationRequest.start(SingleLocationRequest.java:71)
+at com.transistorsoft.locationmanager.location.TSLocationManager.getCurrentPosition(TSLocationManager.java:3)
+at com.transistorsoft.locationmanager.service.TrackingService.changePace(TrackingService.java:321)
+at com.transistorsoft.locationmanager.service.TrackingService$c.onError(TrackingService.java:69)
+at com.transistorsoft.locationmanager.location.SingleLocationRequest.onError(SingleLocationRequest.java:18)
+at com.transistorsoft.locationmanager.location.SingleLocationRequest.start(SingleLocationRequest.java:71)
+at com.transistorsoft.locationmanager.location.TSLocationManager.getCurrentPosition(TSLocationManager.java:3)
+at com.transistorsoft.locationmanager.service.TrackingService.changePace(TrackingService.java:321)
+at com.transistorsoft.locationmanager.service.TrackingService$c.onError(TrackingService.java:69)
+at com.transistorsoft.locationmanager.location.SingleLocationRequest.onError(SingleLocationRequest.java:18)
+at com.transistorsoft.locationmanager.location.SingleLocationRequest.start(SingleLocationRequest.java:71)
+.
+.
+.
+```
+
 ## 4.9.0 &mdash; 2023-02-01
 * [Fixed][Android] Implement support for `play-services-location v21` (`ext.playServicesLocationVersion` in your `android/build.gradle`).  The plugin can now work with either `<= v20` or `>= v21`.
 

@@ -23,8 +23,12 @@ void backgroundGeolocationHeadlessTask(bg.HeadlessEvent headlessEvent) async {
       print("📬 didDeviceReboot: ${state.didDeviceReboot}");
       break;
     case bg.Event.TERMINATE:
+      bg.State state = await bg.BackgroundGeolocation.state;
+      if (state.stopOnTerminate!) {
+        // Don't request getCurrentPosition when stopOnTerminate: true
+        return;
+      }
       try {
-
         bg.Location location =
             await bg.BackgroundGeolocation.getCurrentPosition(
                 samples: 1,
@@ -40,20 +44,20 @@ void backgroundGeolocationHeadlessTask(bg.HeadlessEvent headlessEvent) async {
 
       break;
     case bg.Event.HEARTBEAT:
-      /* DISABLED getCurrentPosition on heartbeat
       try {
         bg.Location location = await bg.BackgroundGeolocation.getCurrentPosition(
-          samples: 1,
+          samples: 2,
+          timeout: 10,
           extras: {
             "event": "heartbeat",
             "headless": true
           }
         );
+
         print('[getCurrentPosition] Headless: $location');
       } catch (error) {
         print('[getCurrentPosition] Headless ERROR: $error');
       }
-      */
       break;
     case bg.Event.LOCATION:
       bg.Location location = headlessEvent.event;
@@ -120,11 +124,11 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
 
   try {
     var location = await bg.BackgroundGeolocation.getCurrentPosition(
-        samples: 1,
-        extras: {
-          "event": "background-fetch",
-          "headless": true
-        }
+	    samples: 2,
+      extras: {
+        "event": "background-fetch",
+        "headless": true
+      }
     );
     print("[location] $location");
   } catch(error) {
@@ -134,7 +138,7 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   int count = 0;
   if (prefs.get("fetch-count") != null) {
-    count = prefs.getInt("fetch-count");
+    count = prefs.getInt("fetch-count")!;
   }
   prefs.setInt("fetch-count", ++count);
   print('[BackgroundFetch] count: $count');
@@ -151,12 +155,12 @@ void main() {
   /// - HomeApp
   ///
   SharedPreferences.getInstance().then((SharedPreferences prefs) {
-    String appName = prefs.getString("app");
+    String? appName = prefs.getString("app");
 
     // Sanitize old-style registration system that only required username.
     // If we find a valid username but null orgname, reverse them.
-    String orgname = prefs.getString("orgname");
-    String username = prefs.getString("username");
+    String? orgname = prefs.getString("orgname");
+    String? username = prefs.getString("username");
 
     if (orgname == null && username != null) {
       prefs.setString("orgname", username);

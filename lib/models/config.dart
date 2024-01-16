@@ -255,6 +255,19 @@ class Config {
   ///
   int? geofenceProximityRadius;
 
+  /// The maximum number of geofences to monitor at-a-time, overriding the platform default (iOS: 20; Android 100).
+  /// **NOTE:** This option is for specialized use-cases where you wish to monitor _LESS THAN_ the platform maximum.  __This option should generally not be used__.
+  ///
+  /// ```dart
+  /// BackgroundGeolocation.ready(Config(
+  ///   maxMonitoredGeofences: 50 // override the Platform maximum (Android: 100)
+  /// )).then((State state) {
+  ///   BackgroundGeolocation.start();  // <-- plugin will automatically #stop in 30 minutes
+  /// });
+  /// ```
+  ///
+  int? maxMonitoredGeofences;
+
   /// When a device is already within a just-created geofence, fire the **enter** transition immediately.
   ///
   /// Defaults to `true`.  Set `false` to disable triggering a geofence immediately if device is already inside it.
@@ -447,6 +460,25 @@ class Config {
   /// __WARNING__ This option is ignored when manually invoking [BackgroundGeolocation.sync].
   ///
   bool? disableAutoSyncOnCellular;
+
+  /// __`[Android-only]`__ Disables the automatic insert of a location record into the SDK's SQLite database and subsequent HTTP upload if configured with [Config.url].
+  /// When a [onProviderChange] event fires, the Android SDK has traditionally recorded a location to show exactly *when* and *where* the state of location-services was changed (eg: Location-services disabled).
+  ///
+  /// Some developers' servers have strict HTTP JSON payloads and possibly using [locationTemplate], where it's impossible to template the automatically appended `provider` key in the payload.
+  ///
+  /// ![](https://www.dropbox.com/s/ljacoquuuv5sd5r/disableProviderChangeRecord.png?dl=1)
+  ///
+  ///  Set `true` to disable this default behaviour.
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// BackgroundGeolocation.ready(Config(
+  ///   disableProviderChangeRecord: true
+  /// ))
+  /// ```
+  ///
+  bool? disableProviderChangeRecord;
 
   /// The HTTP method to use when creating an HTTP request to your configured [url].
   ///
@@ -1431,7 +1463,7 @@ class Config {
   ///
   /// Android can detect when the user has configured the device's *Settings->Location* in a manner that does not match your location request (eg: [Config.desiredAccuracy].  For example, if the user configures *Settings->Location->Mode* with *Battery Saving* (ie: Wifi only) but you've specifically requested [DESIRED_ACCURACY_HIGH] (ie: GPS), Android will show a dialog asking the user to confirm the desired changes.  If the user clicks `[OK]`, the OS will automcatically modify the Device settings.
   ///
-  /// ![](https://www.dropbox.com/s/3kuw1gzzbnajhgf/android-location-resolution-dialog.png?dl=1)
+  /// ![](https://dl.dropbox.com/scl/fi/t7bwdrmogr26rcmrbemkt/android-location-resolution-dialog.png?rlkey=won88t8xo5zcei7ktmurebb5t&dl=1)
   ///
   /// This automated Android dialog will be shown in the following cases:
   /// - [BackgroundGeolocation.onProviderChange]
@@ -1458,7 +1490,7 @@ class Config {
 
   /// __`[iOS Only]`__ A Boolean indicating whether the status bar changes its appearance when an app uses location services in the background.
   ///
-  /// The default value of this property is `false`. The background location usage indicator is a blue bar or a blue pill in the status bar on iOS; on watchOS the indicator is a small icon. Users can tap the indicator to return to your app.
+  /// The default value of this property is `true`. The background location usage indicator is a blue bar or a blue pill in the status bar on iOS; on watchOS the indicator is a small icon. Users can tap the indicator to return to your app.
   ///
   /// This property affects only apps that received `Always` authorization. When such an app moves to the background, the system uses this property to determine whether to change the status bar appearance to indicate that location services are in use. Set this value to true to maintain transparency with the user.
   ///
@@ -1615,31 +1647,42 @@ class Config {
   ///
   /// In the logs, you will see a location being ignored:
   /// ```
-  /// TSLocationManager:   ℹ️  IGNORED: same as last location
+  /// TSLocationManager:   ℹ️ IGNORED: same as last location
   /// ```
   ///
   /// An identical location is often generated when changing state from *stationary* -> *moving*, where a single location is first requested (the [BackgroundGeolocation.onMotionChange] location) before turning on regular location updates.  Changing geolocation config params can also generate a duplicate location (eg: changing [distanceFilter]).
   ///
   bool? allowIdenticalLocations;
 
-  /// __`[Android-only]`__ Enable extra timestamp meta data to be appended to each recorded location, including system-time.
+  /// Enable extra timestamp meta data to be appended to each recorded location, including system-time.
   ///
   /// Some developers have reported GPS [Location.timestamp] issues with some Android devices.  This option will append extra meta-data related to the device's system time.
   ///
-  /// ## Java implementation
+  /// ## Android implementation
   ///
   /// ```Java
-  /// if (enableTimestampMeta) {
-  ///     JSONObject timestampMeta = new JSONObject();
-  ///     timestampMeta.put("time", mLocation.getTime());
-  ///     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-  ///         timestampMeta.put("systemClockElaspsedRealtime", SystemClock.elapsedRealtimeNanos()/1000000);
-  ///         timestampMeta.put("elapsedRealtime", mLocation.getElapsedRealtimeNanos()/1000000);
-  ///     } else {
-  ///         timestampMeta.put("systemTime", System.currentTimeMillis());
-  ///     }
-  ///     data.put("timestampMeta", timestampMeta);
+  /// JSONObject timestampMeta = new JSONObject();
+  /// timestampMeta.put("time", mLocation.getTime());
+  /// if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+  ///     timestampMeta.put("systemClockElaspsedRealtime", SystemClock.elapsedRealtimeNanos()/1000000);
+  ///     timestampMeta.put("elapsedRealtime", mLocation.getElapsedRealtimeNanos()/1000000);
+  /// } else {
+  ///     timestampMeta.put("systemTime", System.currentTimeMillis());
   /// }
+  /// ```
+  ///
+  /// ## iOS Implementation
+  ///
+  /// ```obj-c
+  ///  long long systemTime = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
+  ///  long long locationTime = (long long)([_location.timestamp timeIntervalSince1970] * 1000.0);
+  ///  long long uptime = (long long) [self.class uptime] * 1000;
+  ///
+  ///  return @{
+  ///      @"time": @(locationTime),
+  ///      @"systemTime": @(systemTime),
+  ///      @"systemClockElapsedRealtime": @(uptime)
+  ///  };
   /// ```
   ///
   bool? enableTimestampMeta;
@@ -2041,6 +2084,7 @@ class Config {
       this.elasticityMultiplier,
       this.stopAfterElapsedMinutes,
       this.geofenceProximityRadius,
+      this.maxMonitoredGeofences,
       this.geofenceInitialTriggerEntry,
       this.desiredOdometerAccuracy,
       this.useSignificantChangesOnly,
@@ -2062,6 +2106,7 @@ class Config {
       this.extras,
       this.autoSync,
       this.disableAutoSyncOnCellular,
+      this.disableProviderChangeRecord,
       this.autoSyncThreshold,
       this.batchSync,
       this.maxBatchSize,
@@ -2173,6 +2218,9 @@ class Config {
     if (geofenceProximityRadius != null) {
       config['geofenceProximityRadius'] = geofenceProximityRadius;
     }
+    if (maxMonitoredGeofences != null) {
+      config['maxMonitoredGeofences'] = maxMonitoredGeofences;
+    }
     if (geofenceInitialTriggerEntry != null) {
       config['geofenceInitialTriggerEntry'] = geofenceInitialTriggerEntry;
     }
@@ -2229,6 +2277,9 @@ class Config {
     }
     if (disableAutoSyncOnCellular != null) {
       config['disableAutoSyncOnCellular'] = disableAutoSyncOnCellular;
+    }
+    if (disableProviderChangeRecord != null) {
+      config['disableProviderChangeRecord'] = disableProviderChangeRecord;
     }
     if (autoSyncThreshold != null) {
       config['autoSyncThreshold'] = autoSyncThreshold;

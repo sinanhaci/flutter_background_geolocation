@@ -16,9 +16,9 @@ part of flt_background_geolocation;
 /// The Background Geolocation SDK implements the native iOS and Android Geofencing APIs.
 ///
 /// __ℹ️ Note:__
-/// - Native iOS & Android API support only *circular* geofences.
+/// - Native iOS & Android API support only *circular* geofences, however the plugin does implement a custom mechanism for handling *Polygon Geofences*; see [Geofence.vertices].
 /// - The minimum reliable [Geofence.radius] is `200` meters.
-/// - iOS Geofence monitoring *requires* the user authorize [Config.locationAuthorizationRequest] **`Always`** &mdash; **`When in Use`** will **not** work.
+/// - The native geofencing API for both iOS and Android *require* the user authorize [Config.locationAuthorizationRequest] **`Always`** &mdash; **`When in Use`** will **not** work.
 ///
 /// ## Adding Geofences
 /// ---------------------------------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ part of flt_background_geolocation;
 ///
 /// ### Example
 /// ```dart
-/// BackgroundGeolocation.addGeofences([Geofence(
+/// await BackgroundGeolocation.addGeofences([Geofence(
 ///   identifier: "Home",
 ///   radius: 200,
 ///   latitude: 45.51921926,
@@ -61,11 +61,8 @@ part of flt_background_geolocation;
 ///   latitude: 45.61921927,
 ///   longitude: -73.71678582,
 ///   notifyOnEntry: true
-/// )]).then((bool success) {
-///   print('[addGeofences] success');
-/// }).catchError((dynamic error) => {
-///   print('[addGeofences] FAILURE: $error');
-/// });
+/// )]);
+/// print('[addGeofences] success');
 /// ```
 ///
 /// __ℹ️ Note:__ Adding a geofence having an [Geofence.identifier] which already exists within the SDK's geofence database will cause the previous record to be destroyed and the new one inserted.
@@ -83,7 +80,16 @@ part of flt_background_geolocation;
 /// });
 /// ```
 ///
-/// ## Infinite Geofencing
+/// # Polygon Geofencing
+///
+/// The Background Geolocation SDK supports *Polygon Geofences* (Geofences of any shape).  See API docs [Geofence.vertices].
+/// ℹ️ __*Polygon Geofencing*__ is [sold as a separate add-on](https://shop.transistorsoft.com/products/polygon-geofencing) (fully functional in *DEBUG* builds).
+///
+///
+/// ![](https://dl.dropbox.com/scl/fi/sboshfvar0h41azmb4tyv/polygon-geofencing-parc-outremont-400.png?rlkey=d2s0n3zbzu72e7s2gch9kxd4a&dl=1)
+/// ![](https://dl.dropbox.com/scl/fi/xz48myvjnpp8ko0l2tufg/polygon-geofencing-parc-lafontaine-400.png?rlkey=sf20ns959uj0a0fq0atmj55bz&dl=1)
+///
+/// # Infinite Geofencing
 ///
 /// The Background Geolocation SDK contains unique and powerful Geofencing features that allow you to monitor any number of circular geofences you wish (thousands even), in spite of limits imposed by the native platform APIs (**20 for iOS; 100 for Android**).
 ///
@@ -113,7 +119,7 @@ part of flt_background_geolocation;
 ///   // Remove map circles
 ///   event.off.forEach((String identifier) {
 ///     removeGeofenceMarker(identifier);
-///   }
+///   });
 /// });
 /// ```
 ///
@@ -122,8 +128,8 @@ part of flt_background_geolocation;
 ///
 /// ## Removing Geofences
 ///
-/// Once a geofence has been inserted into the SDK's database using [BackgroundGeolocation.addGeofence] or [BackgroundGeolocation.addGeofences], they will be monitored *forever*.  If you've configured [Config.stopOnTerminate] __`false`__ and [Config.startOnBoot] __`true`__, geofences will continue to be monitored even if the application is terminated or device rebooted.
-/// To cease monitoring a geofence or *geofences*, you must *remove* them from the SDK's database.
+/// Once a geofence has been inserted into the SDK's database using [BackgroundGeolocation.addGeofence] or [BackgroundGeolocation.addGeofences], they will be monitored *forever* (as long as the plugin remains `State.enabled == true`).  If you've configured [Config.stopOnTerminate] __`false`__ and [Config.startOnBoot] __`true`__, geofences will continue to be monitored even if the application is terminated or device rebooted.
+/// To cease monitoring a geofence or *geofences*, you must *remove* them from the SDK's database (or call [BackgroundGeolocation.stop]).
 ///
 /// ### Removing a single geofence by [Geofence.identifier]:
 ///
@@ -141,17 +147,23 @@ part of flt_background_geolocation;
 /// });
 /// ```
 ///
-/// ## Querying Geofences
+/// # Querying Geofences
 ///
 /// Use the method [BackgroundGeolocation.geofences] property to retrieve the entire Array of [Geofence] stored in the SDK's database:
 ///
 /// ```dart
 /// List<Geofence> geofences = await BackgroundGeolocation.geofences;
 /// print('[getGeofences: $geofences');
-///
 /// ```
 ///
-/// ## Monitoring *only* geofences
+/// Or fetch a single geofence by [Geofence.identifier] with [BackgroundGeolocation.getGeofence] :
+///
+/// ```dart
+/// Geofence geofence = await BackgroundGeolocation.getGeofence("home");
+/// print('[getGeofence] $geofence');
+/// ```
+///
+/// # Monitoring *only* geofences
 ///
 /// The BackgroundGeolocation SDK allows you to optionally monitor *only* geofences without constant location-tracking.  To engage *geofences-only* mode, use the method [BackgroundGeolocation.startGeofences] instead of [BackgroundGeolocation.start].
 ///
@@ -172,7 +184,7 @@ part of flt_background_geolocation;
 /// });
 /// ```
 ///
-/// ## Toggling between tracking-modes [BackgroundGeolocation.start] and [BackgroundGeolocation.startGeofences]:
+/// #  Toggling between tracking-modes [BackgroundGeolocation.start] and [BackgroundGeolocation.startGeofences]:
 ///
 /// The SDK can easily be toggled between [State.trackingMode] simply by executing the corresponding [BackgroundGeolocation.start] or [BackgroundGeolocation.startGeofences] methods.
 ///
@@ -222,6 +234,9 @@ class GeofenceEvent {
   /// The [Location] where this geofence triggered.
   late Location location;
 
+  /// The device system time when the Geofence event was received by the OS.  __Note__: this can differ from the timestamp of the triggering location responsible for the geofence (the triggering location can be from the past).
+  late String timestamp;
+
   /// Optional [Geofence.extras]
   Map? extras;
 
@@ -232,12 +247,13 @@ class GeofenceEvent {
 
     this.identifier = params['identifier'];
     this.action = params['action'];
+    this.timestamp = params['timestamp'];
     this.location = new Location(locationData);
     this.extras = params['extras'];
   }
 
   /// String representation of `GeofenceEvent` for `print` to logs.
   String toString() {
-    return '[GeofenceEvent identifier: $identifier, action: $action]';
+    return '[GeofenceEvent identifier: $identifier, action: $action, timestamp: $timestamp]';
   }
 }

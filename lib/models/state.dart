@@ -52,6 +52,7 @@ class State extends Config {
                 _ensureInt(data['stopAfterElapsedMinutes']),
             geofenceProximityRadius:
                 _ensureInt(data['geofenceProximityRadius']),
+            maxMonitoredGeofences: _ensureInt(data['maxMonitoredGeofences']),
             geofenceInitialTriggerEntry:
                 _ensureBool(data['geofenceInitialTriggerEntry']),
             desiredOdometerAccuracy:
@@ -86,6 +87,8 @@ class State extends Config {
             autoSyncThreshold: data['autoSyncThreshold'],
             disableAutoSyncOnCellular:
                 _ensureBool(data['disableAutoSyncOnCellular']),
+            disableProviderChangeRecord:
+                _ensureBool(data['disableProviderChangeRecord']),
             batchSync: _ensureBool(data['batchSync']),
             maxBatchSize: data['maxBatchSize'],
             locationTemplate: data['locationTemplate'],

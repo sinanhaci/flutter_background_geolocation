@@ -5,26 +5,15 @@ import android.app.Application;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.gms.common.GoogleApiAvailability;
+import com.transistorsoft.xms.g.common.ExtensionApiAvailability;
 
-import com.transistorsoft.flutter.backgroundgeolocation.streams.ActivityChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.AuthorizationStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.ConnectivityChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.EnabledChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.GeofenceStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.GeofencesChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.HeartbeatStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.HttpStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.LocationStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.MotionChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.NotificationActionStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.PowerSaveChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.ProviderChangeStreamHandler;
-import com.transistorsoft.flutter.backgroundgeolocation.streams.ScheduleStreamHandler;
+import com.transistorsoft.flutter.backgroundgeolocation.streams.*;
+
 import com.transistorsoft.locationmanager.adapter.BackgroundGeolocation;
 import com.transistorsoft.locationmanager.adapter.TSConfig;
 import com.transistorsoft.locationmanager.adapter.callback.TSBackgroundTaskCallback;
@@ -61,6 +50,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -83,7 +73,7 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
         return sInstance;
     }
 
-    private static synchronized BackgroundGeolocationModule getInstanceSynchronized() {
+    static synchronized BackgroundGeolocationModule getInstanceSynchronized() {
         if (sInstance == null) sInstance = new BackgroundGeolocationModule();
         return sInstance;
     }
@@ -187,10 +177,6 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
         mActivity = activity;
     }
 
-    public static void setPluginRegistrant(PluginRegistry.PluginRegistrantCallback callback) {
-        HeadlessTask.setPluginRegistrant(callback);
-    }
-
     private void initializeLocationManager(Activity activity) {
         mIsInitialized = true;
 
@@ -211,7 +197,7 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
         if (mActivity == null) {
             return;
         }
-        GoogleApiAvailability.getInstance().getErrorDialog(mActivity, errorCode, 1001).show();
+        ExtensionApiAvailability.getInstance().getErrorDialog(mActivity, errorCode, 1001).show();
     }
 
     @SuppressWarnings("unchecked")
@@ -310,7 +296,7 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
         } else if (call.method.equalsIgnoreCase(BackgroundGeolocation.ACTION_GET_PROVIDER_STATE)) {
             getProviderState(result);
         } else if (call.method.equalsIgnoreCase(BackgroundGeolocation.ACTION_REQUEST_PERMISSION)) {
-            requestPermission(result);
+            requestPermission((String) call.arguments, result);
         } else if (call.method.equalsIgnoreCase(ACTION_REQUEST_TEMPORARY_FULL_ACCURACY)) {
             requestTemporaryFullAccuracy((String) call.arguments, result);
         } else if (call.method.equalsIgnoreCase(ACTION_REGISTER_PLUGIN)) {
@@ -340,6 +326,7 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
 
     @SuppressWarnings("unchecked")
     private void ready(Map<String, Object> params, final MethodChannel.Result result) {
+
         boolean reset = (!params.containsKey("reset")) || (boolean) params.get("reset");
         TSConfig config = TSConfig.getInstance(mContext);
 
@@ -462,7 +449,11 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
 
         builder.setCallback(new TSLocationCallback() {
             @Override public void onLocation(TSLocation tsLocation) {
-                result.success(tsLocation.toMap());
+                try {
+                    result.success(tsLocation.toMap());
+                } catch (JSONException e) {
+                    TSLog.logger.error(e.getMessage(), e);
+                }
             }
             @Override public void onError(Integer errorCode) {
                 result.error(errorCode.toString(), null, null);
@@ -496,7 +487,11 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
 
         builder.setCallback(new TSLocationCallback() {
             @Override public void onLocation(TSLocation tsLocation) {
-                result.success(tsLocation.toMap());
+                try {
+                    result.success(tsLocation.toMap());
+                } catch (JSONException e) {
+                    TSLog.logger.error(e.getMessage(), e);
+                }
             }
             @Override public void onError(Integer error) {
                 result.error(error.toString(), null, null);
@@ -617,7 +612,11 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
     private void setOdometer(Double odometer, final MethodChannel.Result result) {
         BackgroundGeolocation.getInstance(mContext).setOdometer(odometer.floatValue(), new TSLocationCallback() {
             @Override public void onLocation(TSLocation location) {
-                result.success(location.toMap());
+                try {
+                    result.success(location.toMap());
+                } catch (JSONException e) {
+                    TSLog.logger.error(e.getMessage(), e);
+                }
             }
             @Override public void onError(Integer errorCode) {
                 result.error(errorCode.toString(), null, null);
@@ -734,18 +733,23 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
         if (geofence.getExtras() != null) {
             data.put("extras", jsonToMap(geofence.getExtras()));
         }
+        data.put("vertices", geofence.getVertices());
         return data;
     }
 
     @SuppressWarnings("unchecked")
     private static TSGeofence buildGeofence(Map<String, Object> config) throws TSGeofence.Exception {
         TSGeofence.Builder builder = new TSGeofence.Builder();
+
         if (config.containsKey("identifier"))       { builder.setIdentifier((String) config.get("identifier")); }
-        if (config.containsKey("latitude"))         { builder.setLatitude((Double) config.get("latitude")); }
-        if (config.containsKey("longitude"))        { builder.setLongitude((Double) config.get("longitude")); }
-        if (config.containsKey("radius")) {
+        if (config.get("latitude") != null)         { builder.setLatitude((Double) config.get("latitude")); }
+        if (config.get("longitude") != null)        { builder.setLongitude((Double) config.get("longitude")); }
+        if (config.get("radius") != null) {
             Double radius = (Double) config.get("radius");
             builder.setRadius(radius.floatValue());
+        }
+        if (config.get("vertices") != null) {
+            builder.setVertices((List<List<Double>>) config.get("vertices"));
         }
         if (config.containsKey("notifyOnEntry"))    { builder.setNotifyOnEntry((boolean) config.get("notifyOnEntry")); }
         if (config.containsKey("notifyOnExit"))     { builder.setNotifyOnExit((boolean) config.get("notifyOnExit")); }
@@ -764,6 +768,7 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
     private void startBackgroundTask(final MethodChannel.Result result) {
         BackgroundGeolocation.getInstance(mContext).startBackgroundTask(new TSBackgroundTaskCallback() {
             @Override public void onStart(int taskId) { result.success(taskId); }
+            @Override public void onCancel(int taskId) { } // NO IMPLEMENTATION
         });
     }
 
@@ -878,6 +883,18 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
 
     private void requestPermission(final MethodChannel.Result result) {
         BackgroundGeolocation.getInstance(mContext).requestPermission(new TSRequestPermissionCallback() {
+            @Override public void onSuccess(int status) { result.success(status); }
+            @Override public void onFailure(int status) { result.error("DENIED", null, status); }
+        });
+    }
+
+    private void requestPermission(final String permission, final MethodChannel.Result result) {
+        if (permission == null) {
+            requestPermission(result);
+            return;
+        }
+        // NOT YET IMPLEMENTED.  For future implementation of requesting individual permissions.
+        BackgroundGeolocation.getInstance(mContext).requestPermission(permission, new TSRequestPermissionCallback() {
             @Override public void onSuccess(int status) { result.success(status); }
             @Override public void onFailure(int status) { result.error("DENIED", null, status); }
         });
@@ -1041,6 +1058,9 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
 
     @Override
     public void onActivityResumed(Activity activity) {
+        if (!activity.equals(mActivity)) {
+            return;
+        }
         TSScheduleManager.getInstance(activity).cancelOneShot(TerminateEvent.ACTION);
     }
     @Override
@@ -1051,9 +1071,12 @@ public class BackgroundGeolocationModule  implements MethodChannel.MethodCallHan
     }
     @Override
     public void onActivityStopped(Activity activity) {
+        if (!activity.equals(mActivity)) {
+            return;
+        }
         TSConfig config = TSConfig.getInstance(activity);
         if (config.getEnabled()) {
-            TSScheduleManager.getInstance(activity).oneShot(TerminateEvent.ACTION, 10000, true);
+            TSScheduleManager.getInstance(activity).oneShot(TerminateEvent.ACTION, 10000, true, false);
         }
     }
 

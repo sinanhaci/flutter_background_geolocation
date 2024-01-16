@@ -163,13 +163,11 @@
 		97C146E61CF9000F007C117D /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1300;
+				LastUpgradeCheck = 1430;
 				ORGANIZATIONNAME = "The Chromium Authors";
 				TargetAttributes = {
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
-						DevelopmentTeam = 32A636YFGZ;
-						ProvisioningStyle = Automatic;
 						SystemCapabilities = {
 							com.apple.BackgroundModes = {
 								enabled = 1;
@@ -236,13 +234,14 @@
 			files = (
 			);
 			inputPaths = (
+				"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}",
 			);
 			name = "Thin Binary";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n";
 		};
 		9740EEB61CF901F6004384FC /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -417,10 +416,29 @@
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-l\"CocoaLumberjack\"",
+					"-l\"background_fetch\"",
+					"-l\"flutter_background_geolocation\"",
+					"-l\"shared_preferences_foundation\"",
+					"-l\"sqlite3\"",
+					"-l\"stdc++\"",
+					"-l\"url_launcher_ios\"",
+					"-l\"z\"",
+					"-framework",
+					"\"TSBackgroundFetch\"",
+					"-framework",
+					"\"TSLocationManager\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.transistorsoft.flutterBackgroundGeolocationExample;
 				PRODUCT_NAME = "BG Geo";
@@ -446,10 +464,29 @@
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-l\"CocoaLumberjack\"",
+					"-l\"background_fetch\"",
+					"-l\"flutter_background_geolocation\"",
+					"-l\"shared_preferences_foundation\"",
+					"-l\"sqlite3\"",
+					"-l\"stdc++\"",
+					"-l\"url_launcher_ios\"",
+					"-l\"z\"",
+					"-framework",
+					"\"TSBackgroundFetch\"",
+					"-framework",
+					"\"TSLocationManager\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.transistorsoft.flutterBackgroundGeolocationExample;
 				PRODUCT_NAME = "BG Geo";

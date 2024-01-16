@@ -3,7 +3,6 @@ package com.transistorsoft.flutter.backgroundgeolocation.streams;
 import android.content.Context;
 
 import com.transistorsoft.flutter.backgroundgeolocation.BackgroundGeolocationModule;
-
 import com.transistorsoft.locationmanager.adapter.BackgroundGeolocation;
 import com.transistorsoft.locationmanager.logger.TSLog;
 
@@ -35,4 +34,5 @@ class StreamHandler implements EventChannel.StreamHandler{
     public void onCancel(Object args) {
         BackgroundGeolocation.getInstance(mContext).removeListener(mEvent, this);
     }
+
 }

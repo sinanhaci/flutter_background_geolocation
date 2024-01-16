@@ -18,7 +18,7 @@ class MainMenuButton extends StatefulWidget {
 }
 
 class MainMenuButtonState extends State<MainMenuButton> {
-  BuildContext _context;
+  late BuildContext _context;
 
   void _onClickMenu() async {
 
@@ -53,7 +53,6 @@ class MainMenuButtonState extends State<MainMenuButton> {
 
   void _onClickRequestPermission() async {
     bg.ProviderChangeEvent providerState = await bg.BackgroundGeolocation.providerState;
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -82,6 +81,7 @@ class MainMenuButtonState extends State<MainMenuButton> {
 
   void _requestPermission(String request) async {
     Navigator.of(context).pop();
+
     await bg.BackgroundGeolocation.setConfig(bg.Config(locationAuthorizationRequest: request));
 
     int status = await bg.BackgroundGeolocation.requestPermission();

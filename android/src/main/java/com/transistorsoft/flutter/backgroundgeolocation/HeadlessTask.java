@@ -35,8 +35,6 @@ import io.flutter.view.FlutterCallbackInformation;
 public class HeadlessTask implements MethodChannel.MethodCallHandler, Runnable {
     private static final String KEY_REGISTRATION_CALLBACK_ID    = "registrationCallbackId";
     private static final String KEY_CLIENT_CALLBACK_ID          = "clientCallbackId";
-
-    private static PluginRegistry.PluginRegistrantCallback sPluginRegistrantCallback;
     static private Long sRegistrationCallbackId;
     static private Long sClientCallbackId;
 
@@ -48,12 +46,6 @@ public class HeadlessTask implements MethodChannel.MethodCallHandler, Runnable {
 
     private final AtomicBoolean mHeadlessTaskRegistered = new AtomicBoolean(false);
     private final List<HeadlessEvent> mEvents = new ArrayList<>();
-
-    // Called by Application#onCreate.  Must be public.
-    public static void setPluginRegistrant(PluginRegistry.PluginRegistrantCallback callback) {
-        sPluginRegistrantCallback = callback;
-    }
-
     // Called by FLTBackgroundGeolocationPlugin
     static boolean register(final Context context, final List<Object> callbacks) {
         BackgroundGeolocation.getThreadPool().execute(new RegistrationTask(context, callbacks));
@@ -124,7 +116,11 @@ public class HeadlessTask implements MethodChannel.MethodCallHandler, Runnable {
         if (name.equals(BackgroundGeolocation.EVENT_TERMINATE)) {
             result = event.getTerminateEvent();
         } else if (name.equals(BackgroundGeolocation.EVENT_LOCATION)) {
-            result = event.getLocationEvent().toJson();
+            try {
+                result = event.getLocationEvent().toJson();
+            } catch (JSONException e) {
+                TSLog.logger.error(e.getMessage(), e);
+            }
         } else if (name.equals(BackgroundGeolocation.EVENT_MOTIONCHANGE)) {
             result = event.getMotionChangeEvent().toJson();
         } else if (name.equals(BackgroundGeolocation.EVENT_HTTP)) {
@@ -184,12 +180,6 @@ public class HeadlessTask implements MethodChannel.MethodCallHandler, Runnable {
             }
             DartExecutor.DartCallback dartCallback = new DartExecutor.DartCallback(assets, appBundlePath, callbackInfo);
             executor.executeDartCallback(dartCallback);
-
-            // The pluginRegistrantCallback should only be set in the V1 embedding as
-            // plugin registration is done via reflection in the V2 embedding.
-            if (sPluginRegistrantCallback != null) {
-                sPluginRegistrantCallback.registerWith(new ShimPluginRegistry(sBackgroundFlutterEngine));
-            }
         }
     }
     /**
